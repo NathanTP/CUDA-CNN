@@ -85,6 +85,7 @@ static double forward_pass(double data[28][28])
 }
 
 /* XXX Some thoughts about how this might look. I don't know if the generic_forward thing will work, it might need some extra args to nvcc  */
+#if 0
 /* static double pyplover_forward_pass(double data[28][28]) */
 /* { */
 /*   /* PACK INPUT INTO s */ */
@@ -115,6 +116,7 @@ static double forward_pass(double data[28][28])
 /*      PACK OUTPUT INTO s.out */
 /*  */ */
 /* } */
+#endif
 
 // Back propagation to update weights
 static double back_pass()
