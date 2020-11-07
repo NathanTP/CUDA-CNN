@@ -6,7 +6,6 @@
 
 #ifndef LAYER_H
 #define LAYER_H
-#endif
 
 const static float dt = 1.0E-01f;
 const static float threshold = 1.0E-02f;
@@ -15,20 +14,27 @@ class Layer {
 	public:
 	int M, N, O;
 
-	float *output;
+  // All of the following float* are device pointers
+	
+  // Temporary storage for forward pass
+  float *output;
 	float *preact;
 
+  // These define the model at this layer
 	float *bias;
 	float *weight;
 
+  // Temporary storage for backprop
 	float *d_output;
 	float *d_preact;
 	float *d_weight;
 
 	Layer(int M, int N, int O);
+  Layer(std::string path, bool enableTrain);
 
 	~Layer();
 
+  bool save(std::string path);
 	void setOutput(float *data);
 	void clear();
 	void bp_clear();
@@ -60,3 +66,4 @@ __global__ void bp_output_c1(float d_output[6][24][24], float n_weight[1][4][4],
 __global__ void bp_preact_c1(float d_preact[6][24][24], float d_output[6][24][24], float preact[6][24][24]);
 __global__ void bp_weight_c1(float d_weight[6][5][5], float d_preact[6][24][24], float p_output[28][28]);
 __global__ void bp_bias_c1(float bias[6], float d_preact[6][24][24]);
+#endif

@@ -2,6 +2,11 @@
 #define MNIST_DOUBLE
 #include "mnist.h"
 #include "layer.h"
+#include "model.h"
+
+#include <iostream>
+#include <fstream>
+#include <string>
 
 #include <cuda.h>
 #include <cstdio>
@@ -11,16 +16,16 @@ static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
 
 // Define layers of CNN
-static Layer l_input = Layer(0, 0, 28*28);
-static Layer l_c1 = Layer(5*5, 6, 24*24*6);
-static Layer l_s1 = Layer(4*4, 1, 6*6*6);
-static Layer l_f = Layer(6*6*6, 10, 10);
+/* static Layer l_input = Layer(0, 0, 28*28); */
+/* static Layer l_c1 = Layer(5*5, 6, 24*24*6); */
+/* static Layer l_s1 = Layer(4*4, 1, 6*6*6); */
+/* static Layer l_f = Layer(6*6*6, 10, 10); */
 
-static void learn();
-static unsigned int classify(double data[28][28]);
-static void test();
-static double forward_pass(double data[28][28]);
-static double back_pass();
+static void learn(Model *m);
+static unsigned int classify(double data[28][28], Model *m);
+static void test(Model *m);
+static double forward_pass(double data[28][28], Model *m);
+static double back_pass(Model *m);
 
 static inline void loaddata()
 {
@@ -32,6 +37,12 @@ static inline void loaddata()
 
 int main(int argc, const  char **argv)
 {
+  Model *m;
+  if(argc > 1) {
+    m = new  Model(std::string(argv[1]), true); 
+  } else {
+    m = new Model();
+  }
 	srand(time(NULL));
 
 	CUresult err = cuInit(0);
@@ -40,15 +51,21 @@ int main(int argc, const  char **argv)
 		return 1;
 	}
 
-	loaddata();
-	learn();
-	test();
+  loaddata();
+  if(argc > 1) {
+    test(m);
+  } else {
+    learn(m);
+    m->save("testModel");
+    test(m);
+  }
 
+  delete m;
 	return 0;
 }
 
 // Forward propagation of a single row in dataset
-static double forward_pass(double data[28][28])
+static double forward_pass(double data[28][28], Model *m)
 {
 	float input[28][28];
 
@@ -58,27 +75,27 @@ static double forward_pass(double data[28][28])
 		}
 	}
 
-	l_input.clear();
-	l_c1.clear();
-	l_s1.clear();
-	l_f.clear();
+	m->l_input->clear();
+	m->l_c1->clear();
+	m->l_s1->clear();
+	m->l_f->clear();
 
 	clock_t start, end;
 	start = clock();
 
-	l_input.setOutput((float *)input);
+	m->l_input->setOutput((float *)input);
 	
-	fp_preact_c1<<<64, 64>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight);
-	fp_bias_c1<<<64, 64>>>((float (*)[24][24])l_c1.preact, l_c1.bias);
-	apply_step_function<<<64, 64>>>(l_c1.preact, l_c1.output, l_c1.O);
+	fp_preact_c1<<<64, 64>>>((float (*)[28])m->l_input->output, (float (*)[24][24])m->l_c1->preact, (float (*)[5][5])m->l_c1->weight);
+	fp_bias_c1<<<64, 64>>>((float (*)[24][24])m->l_c1->preact, m->l_c1->bias);
+	apply_step_function<<<64, 64>>>(m->l_c1->preact, m->l_c1->output, m->l_c1->O);
 
-	fp_preact_s1<<<64, 64>>>((float (*)[24][24])l_c1.output, (float (*)[6][6])l_s1.preact, (float (*)[4][4])l_s1.weight);
-	fp_bias_s1<<<64, 64>>>((float (*)[6][6])l_s1.preact, l_s1.bias);
-	apply_step_function<<<64, 64>>>(l_s1.preact, l_s1.output, l_s1.O);
+	fp_preact_s1<<<64, 64>>>((float (*)[24][24])m->l_c1->output, (float (*)[6][6])m->l_s1->preact, (float (*)[4][4])m->l_s1->weight);
+	fp_bias_s1<<<64, 64>>>((float (*)[6][6])m->l_s1->preact, m->l_s1->bias);
+	apply_step_function<<<64, 64>>>(m->l_s1->preact, m->l_s1->output, m->l_s1->O);
 
-	fp_preact_f<<<64, 64>>>((float (*)[6][6])l_s1.output, l_f.preact, (float (*)[6][6][6])l_f.weight);
-	fp_bias_f<<<64, 64>>>(l_f.preact, l_f.bias);
-	apply_step_function<<<64, 64>>>(l_f.preact, l_f.output, l_f.O);
+	fp_preact_f<<<64, 64>>>((float (*)[6][6])m->l_s1->output, m->l_f->preact, (float (*)[6][6][6])m->l_f->weight);
+	fp_bias_f<<<64, 64>>>(m->l_f->preact, m->l_f->bias);
+	apply_step_function<<<64, 64>>>(m->l_f->preact, m->l_f->output, m->l_f->O);
 	
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -100,17 +117,17 @@ static double forward_pass(double data[28][28])
 /*   /*  */
 /*      UNPACK ARGUMENTS FROM S */
 /*   */ */
-/* 	fp_preact_c1<<<64, 64>>>((float (*)[28])l_input.output, (float (*)[24][24])l_c1.preact, (float (*)[5][5])l_c1.weight); */
-/* 	fp_bias_c1<<<64, 64>>>((float (*)[24][24])l_c1.preact, l_c1.bias); */
-/* 	apply_step_function<<<64, 64>>>(l_c1.preact, l_c1.output, l_c1.O); */
+/* 	fp_preact_c1<<<64, 64>>>((float (*)[28])l_input->output, (float (*)[24][24])l_c1->preact, (float (*)[5][5])l_c1->weight); */
+/* 	fp_bias_c1<<<64, 64>>>((float (*)[24][24])l_c1->preact, l_c1->bias); */
+/* 	apply_step_function<<<64, 64>>>(l_c1->preact, l_c1->output, l_c1->O); */
 /*  */
-/* 	fp_preact_s1<<<64, 64>>>((float (*)[24][24])l_c1.output, (float (*)[6][6])l_s1.preact, (float (*)[4][4])l_s1.weight); */
-/* 	fp_bias_s1<<<64, 64>>>((float (*)[6][6])l_s1.preact, l_s1.bias); */
-/* 	apply_step_function<<<64, 64>>>(l_s1.preact, l_s1.output, l_s1.O); */
+/* 	fp_preact_s1<<<64, 64>>>((float (*)[24][24])l_c1->output, (float (*)[6][6])l_s1->preact, (float (*)[4][4])l_s1->weight); */
+/* 	fp_bias_s1<<<64, 64>>>((float (*)[6][6])l_s1->preact, l_s1->bias); */
+/* 	apply_step_function<<<64, 64>>>(l_s1->preact, l_s1->output, l_s1->O); */
 /*  */
-/* 	fp_preact_f<<<64, 64>>>((float (*)[6][6])l_s1.output, l_f.preact, (float (*)[6][6][6])l_f.weight); */
-/* 	fp_bias_f<<<64, 64>>>(l_f.preact, l_f.bias); */
-/* 	apply_step_function<<<64, 64>>>(l_f.preact, l_f.output, l_f.O); */
+/* 	fp_preact_f<<<64, 64>>>((float (*)[6][6])l_s1->output, l_f->preact, (float (*)[6][6][6])l_f->weight); */
+/* 	fp_bias_f<<<64, 64>>>(l_f->preact, l_f->bias); */
+/* 	apply_step_function<<<64, 64>>>(l_f->preact, l_f->output, l_f->O); */
 /* 	 */
 /*   /* */
 /*      PACK OUTPUT INTO s.out */
@@ -119,29 +136,29 @@ static double forward_pass(double data[28][28])
 #endif
 
 // Back propagation to update weights
-static double back_pass()
+static double back_pass(Model *m)
 {
 	clock_t start, end;
 
 	start = clock();
 
-	bp_weight_f<<<64, 64>>>((float (*)[6][6][6])l_f.d_weight, l_f.d_preact, (float (*)[6][6])l_s1.output);
-	bp_bias_f<<<64, 64>>>(l_f.bias, l_f.d_preact);
+	bp_weight_f<<<64, 64>>>((float (*)[6][6][6])m->l_f->d_weight, m->l_f->d_preact, (float (*)[6][6])m->l_s1->output);
+	bp_bias_f<<<64, 64>>>(m->l_f->bias, m->l_f->d_preact);
 
-	bp_output_s1<<<64, 64>>>((float (*)[6][6])l_s1.d_output, (float (*)[6][6][6])l_f.weight, l_f.d_preact);
-	bp_preact_s1<<<64, 64>>>((float (*)[6][6])l_s1.d_preact, (float (*)[6][6])l_s1.d_output, (float (*)[6][6])l_s1.preact);
-	bp_weight_s1<<<64, 64>>>((float (*)[4][4])l_s1.d_weight, (float (*)[6][6])l_s1.d_preact, (float (*)[24][24])l_c1.output);
-	bp_bias_s1<<<64, 64>>>(l_s1.bias, (float (*)[6][6])l_s1.d_preact);
+	bp_output_s1<<<64, 64>>>((float (*)[6][6])m->l_s1->d_output, (float (*)[6][6][6])m->l_f->weight, m->l_f->d_preact);
+	bp_preact_s1<<<64, 64>>>((float (*)[6][6])m->l_s1->d_preact, (float (*)[6][6])m->l_s1->d_output, (float (*)[6][6])m->l_s1->preact);
+	bp_weight_s1<<<64, 64>>>((float (*)[4][4])m->l_s1->d_weight, (float (*)[6][6])m->l_s1->d_preact, (float (*)[24][24])m->l_c1->output);
+	bp_bias_s1<<<64, 64>>>(m->l_s1->bias, (float (*)[6][6])m->l_s1->d_preact);
 
-	bp_output_c1<<<64, 64>>>((float (*)[24][24])l_c1.d_output, (float (*)[4][4])l_s1.weight, (float (*)[6][6])l_s1.d_preact);
-	bp_preact_c1<<<64, 64>>>((float (*)[24][24])l_c1.d_preact, (float (*)[24][24])l_c1.d_output, (float (*)[24][24])l_c1.preact);
-	bp_weight_c1<<<64, 64>>>((float (*)[5][5])l_c1.d_weight, (float (*)[24][24])l_c1.d_preact, (float (*)[28])l_input.output);
-	bp_bias_c1<<<64, 64>>>(l_c1.bias, (float (*)[24][24])l_c1.d_preact);
+	bp_output_c1<<<64, 64>>>((float (*)[24][24])m->l_c1->d_output, (float (*)[4][4])m->l_s1->weight, (float (*)[6][6])m->l_s1->d_preact);
+	bp_preact_c1<<<64, 64>>>((float (*)[24][24])m->l_c1->d_preact, (float (*)[24][24])m->l_c1->d_output, (float (*)[24][24])m->l_c1->preact);
+	bp_weight_c1<<<64, 64>>>((float (*)[5][5])m->l_c1->d_weight, (float (*)[24][24])m->l_c1->d_preact, (float (*)[28])m->l_input->output);
+	bp_bias_c1<<<64, 64>>>(m->l_c1->bias, (float (*)[24][24])m->l_c1->d_preact);
 
 
-	apply_grad<<<64, 64>>>(l_f.weight, l_f.d_weight, l_f.M * l_f.N);
-	apply_grad<<<64, 64>>>(l_s1.weight, l_s1.d_weight, l_s1.M * l_s1.N);
-	apply_grad<<<64, 64>>>(l_c1.weight, l_c1.d_weight, l_c1.M * l_c1.N);
+	apply_grad<<<64, 64>>>(m->l_f->weight, m->l_f->d_weight, m->l_f->M * m->l_f->N);
+	apply_grad<<<64, 64>>>(m->l_s1->weight, m->l_s1->d_weight, m->l_s1->M * m->l_s1->N);
+	apply_grad<<<64, 64>>>(m->l_c1->weight, m->l_c1->d_weight, m->l_c1->M * m->l_c1->N);
 
 	end = clock();
 	return ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -163,13 +180,13 @@ static void unfold_input(double input[28][28], double unfolded[24*24][5*5])
 		}
 }
 
-static void learn()
+static void learn(Model *m)
 {
 	static cublasHandle_t blas;
 	cublasCreate(&blas);
 
 	float err;
-	int iter = 50;
+	int iter = 1;
 	
 	double time_taken = 0.0;
 
@@ -181,18 +198,18 @@ static void learn()
 		for (int i = 0; i < train_cnt; ++i) {
 			float tmp_err;
 
-			time_taken += forward_pass(train_set[i].data);
+			time_taken += forward_pass(train_set[i].data, m);
 
-			l_f.bp_clear();
-			l_s1.bp_clear();
-			l_c1.bp_clear();
+			m->l_f->bp_clear();
+			m->l_s1->bp_clear();
+			m->l_c1->bp_clear();
 
 			// Euclid distance of train_set[i]
-			makeError<<<10, 1>>>(l_f.d_preact, l_f.output, train_set[i].label, 10);
-			cublasSnrm2(blas, 10, l_f.d_preact, 1, &tmp_err);
+			makeError<<<10, 1>>>(m->l_f->d_preact, m->l_f->output, train_set[i].label, 10);
+			cublasSnrm2(blas, 10, m->l_f->d_preact, 1, &tmp_err);
 			err += tmp_err;
 
-			time_taken += back_pass();
+			time_taken += back_pass(m);
 		}
 
 		err /= train_cnt;
@@ -210,15 +227,15 @@ static void learn()
 
 
 // Returns label of given data (0-9)
-static unsigned int classify(double data[28][28])
+static unsigned int classify(double data[28][28], Model *m)
 {
 	float res[10];
 
-	forward_pass(data);
+	forward_pass(data, m);
 
 	unsigned int max = 0;
 
-	cudaMemcpy(res, l_f.output, sizeof(float) * 10, cudaMemcpyDeviceToHost);
+	cudaMemcpy(res, m->l_f->output, sizeof(float) * 10, cudaMemcpyDeviceToHost);
 
 	for (int i = 1; i < 10; ++i) {
 		if (res[max] < res[i]) {
@@ -230,12 +247,12 @@ static unsigned int classify(double data[28][28])
 }
 
 // Perform forward propagation of test data
-static void test()
+static void test(Model *m)
 {
 	int error = 0;
 
 	for (int i = 0; i < test_cnt; ++i) {
-		if (classify(test_set[i].data) != test_set[i].label) {
+		if (classify(test_set[i].data, m) != test_set[i].label) {
 			++error;
 		}
 	}

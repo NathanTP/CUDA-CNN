@@ -1,5 +1,5 @@
 all:
-	nvcc -lcuda -lcublas *.cu -o CNN
+	nvcc -O0 -g -std=c++14 -lcuda -lcublas *.cu -o CNN
 
 run:
 	./CNN
