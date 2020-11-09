@@ -1,16 +1,16 @@
 #define USE_MNIST_LOADER
 #define MNIST_DOUBLE
 #include "mnist.h"
-#include "layer.h"
-#include "model.h"
+#include "libfaascnn.h"
 
 #include <iostream>
 #include <fstream>
 #include <string>
 
-#include <cuda.h>
 #include <cstdio>
 #include <time.h>
+
+const static float threshold = 1.0E-02f;
 
 static mnist_data *train_set, *test_set;
 static unsigned int train_cnt, test_cnt;
@@ -21,12 +21,22 @@ static void learn(Model *m);
 // Evaluate a trained model, returns the error rate
 static void test(Model *m);
 
-static inline void loaddata()
+static inline bool loaddata()
 {
-	mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
+  int err;
+	err = mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
 		&train_set, &train_cnt);
-	mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
+  if(err != 0) {
+    fprintf(stderr, "Failed to load training data\n");
+    return false;
+  }
+	err = mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
 		&test_set, &test_cnt);
+  if(err != 0) {
+    fprintf(stderr, "Failed to load t10k-images data\n");
+    return false;
+  }
+  return true;
 }
 
 int main(int argc, const  char **argv)
@@ -39,13 +49,16 @@ int main(int argc, const  char **argv)
   }
 	srand(time(NULL));
 
-	CUresult err = cuInit(0);
-	if (err != CUDA_SUCCESS) {
-		fprintf(stderr, "CUDA initialisation failed with error code - %d\n", err);
-		return 1;
-	}
+  bool ok = initLibfaascnn();
+  if(!ok) {
+    return 1;
+  }
 
-  loaddata();
+  ok = loaddata();
+  if(!ok) {
+    return 1;
+  }
+
   if(argc > 1) {
     test(m);
   } else {
@@ -69,7 +82,7 @@ static void learn(Model *m)
 		err = 0.0f;
 
     printf("Running iteration for %d inputs\n", train_cnt);
-		for (int i = 0; i < train_cnt; ++i) {
+		for (unsigned int i = 0; i < train_cnt; ++i) {
 			m->ForwardPass(train_set[i].data);
 			err += m->BackPassPrepare(train_set[i].label);
 			m->BackPass();
@@ -90,7 +103,7 @@ static void test(Model *m)
 {
 	int error = 0;
 
-	for (int i = 0; i < test_cnt; ++i) {
+	for (unsigned int i = 0; i < test_cnt; ++i) {
 		if (m->Classify(test_set[i].data) != test_set[i].label) {
 			++error;
 		}

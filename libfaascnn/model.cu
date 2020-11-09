@@ -1,10 +1,13 @@
 #include "model.h"
+#include "util.h"
 #include <sys/stat.h>
 #include <string.h>
+#include <cublas_v2.h>
 
 Model::Model(void)
 {
-	cublasCreate(&blas);
+  blas = malloc(sizeof(cublasHandle_t));
+	cublasCreate((cublasHandle_t*)blas);
 
   l_input = new Layer(0, 0, 28*28);
   l_c1 = new Layer(5*5, 6, 24*24*6);
@@ -14,7 +17,8 @@ Model::Model(void)
 
 Model::Model(std::string modelDir, bool enableTrain)
 {
-	cublasCreate(&blas);
+  blas = malloc(sizeof(cublasHandle_t));
+	cublasCreate((cublasHandle_t*)blas);
 
   l_input = new Layer(modelDir + "/l_input", enableTrain);
   l_c1 = new Layer(modelDir + "/l_c1", enableTrain);
@@ -90,7 +94,7 @@ float Model::BackPassPrepare(unsigned char targetLabel)
 
   // Euclid distance of train_set[i]
   makeError<<<10, 1>>>(l_f->d_preact, l_f->output, targetLabel, 10);
-  cublasSnrm2(blas, 10, l_f->d_preact, 1, &err);
+  cublasSnrm2(*(cublasHandle_t*)blas, 10, l_f->d_preact, 1, &err);
 
   return err;
 }

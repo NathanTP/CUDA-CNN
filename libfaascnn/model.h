@@ -34,7 +34,8 @@ class Model {
   bool save(std::string modelDir);
 
   private:
-  cublasHandle_t blas;
+  // this is actually a cublasHandle_t* but I don't want clients to have to include cuda headers
+  void *blas;
 };
 
 #endif
