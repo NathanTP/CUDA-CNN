@@ -1,7 +1,7 @@
 #define USE_MNIST_LOADER
 #define MNIST_DOUBLE
 #include "mnist.h"
-#include "libfaascnn.h"
+#include "libcnn.h"
 
 #include <iostream>
 #include <fstream>

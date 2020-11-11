@@ -1,8 +1,8 @@
 CC := g++
 CFLAGS := -O0 -g -Wall -Wextra -std=c++14 
 # CFLAGS := -O0 -g -Wall -Wextra -Werror -std=c++14
-LIBS:=-L../libfaascnn/ -lfaascnn -lpthread
-INCLUDES:=-I../libfaascnn
+LIBS:=-L../libcnn/ -lcnn -lpthread
+INCLUDES:=-I../libcnn
 
 test: main.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS) 

@@ -3,11 +3,11 @@ NVCC_OPTS := -O3 -g -arch=compute_35 -Xcompiler -Wall -Xcompiler -Wextra -Xcompi
 LIBS :=  -lcuda -lcublas
 # NVCC_OPTS := -O0 -g -std=c++14 -lcuda -lcublas
 
-libfaascnn.so: layer.o model.o util.o
+libcnn.so: layer.o model.o util.o
 	$(NVCC) $^ --shared $(NVCC_OPTS) $(LIBS) -o $@
 
 %.o: %.cu
 	$(NVCC) -c $< $(NVCC_OPTS)
 
 clean:
-	rm -f libfaascnn.so *.o
+	rm -f libcnn.so *.o
