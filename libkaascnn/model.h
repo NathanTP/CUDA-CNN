@@ -23,7 +23,7 @@ extern "C" modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layer
 
 // Convenience function to all each layer's forward pass and extract the
 // prediction. You can also use the lower-level functions defined below.
-extern "C" unsigned int classify(modelState_t *m, double inp[28][28]);
+extern "C" unsigned int classify(modelState_t *m, float inp[28][28]);
 
 /*====================================================
  * Lowest-layer interfaces, these take only device pointers and only call CUDA
@@ -45,7 +45,7 @@ extern "C" void kaasLayerSForward(float *input, float *preact, float *weight, fl
 extern "C" void kaasLayerFinForward(float *input, float *preact, float *weight, float *bias, float *output);
 #else
 modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layerParams_t *s1, layerParams_t *fin);
-unsigned int classify(modelState_t *m, double inp[28][28]);
+unsigned int classify(modelState_t *m, float inp[28][28]);
 void kaasLayerCForward(float *input, float *preact, float *weight, float *bias, float *output);
 void kaasLayerSForward(float *input, float *preact, float *weight, float *bias, float *output);
 void kaasLayerFinForward(float *input, float *preact, float *weight, float *bias, float *output);

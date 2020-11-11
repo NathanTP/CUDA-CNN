@@ -16,20 +16,22 @@ extern "C" modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layer
   return m;
 }
 
-extern "C" unsigned int classify(modelState_t *m, double inp[28][28])
+extern "C" unsigned int classify(modelState_t *m, float inp[28][28])
 {
+  /* for(int i = 0; i < 28; i++) { */
+  /*   printf("\n"); */
+  /*   for(int j = 0; j < 28; j++) { */
+  /*     printf("%lf,", inp[i][j]); */
+  /*   } */
+  /* } */
+  /* printf("\n"); */
+
   clearLayer(m->input);
   clearLayer(m->c);
   clearLayer(m->s);
   clearLayer(m->fin);
 
-  float finp[28][28];
-  for(int i = 0; i < 28; i++) {
-    for(int j = 0; j < 28; j++) {
-      finp[i][j] = (float)inp[i][j];
-    }
-  }
-  cudaMemcpy(m->input->output, finp, 28*28*sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(m->input->output, inp, 28*28*sizeof(float), cudaMemcpyHostToDevice);
 
   kaasLayerCForward(m->input->output, m->c->preact, m->c->weight, m->c->bias, m->c->output);
   kaasLayerSForward(m->c->output, m->s->preact, m->s->weight, m->s->bias, m->s->output);

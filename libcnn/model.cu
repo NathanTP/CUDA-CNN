@@ -35,7 +35,7 @@ Model::~Model()
 }
 
 // Returns a prediction for the digit image (0-9)
-unsigned int Model::Classify(double data[28][28])
+unsigned int Model::Classify(float data[28][28])
 {
 	float res[10];
 
@@ -54,22 +54,14 @@ unsigned int Model::Classify(double data[28][28])
 	return max;
 }
 
-void Model::ForwardPass(double data[28][28])
+void Model::ForwardPass(float data[28][28])
 {
-	float input[28][28];
-
-	for (int i = 0; i < 28; ++i) {
-		for (int j = 0; j < 28; ++j) {
-			input[i][j] = data[i][j];
-		}
-	}
-
 	l_input->clear();
 	l_c1->clear();
 	l_s1->clear();
 	l_f->clear();
 
-	l_input->setOutput((float *)input);
+	l_input->setOutput((float *)data);
 	
 	fp_preact_c1<<<64, 64>>>((float (*)[28])l_input->output, (float (*)[24][24])l_c1->preact, (float (*)[5][5])l_c1->weight);
 	fp_bias_c1<<<64, 64>>>((float (*)[24][24])l_c1->preact, l_c1->bias);

@@ -17,11 +17,11 @@ class Model {
 
 
   // Returns a prediction for the digit image (0-9)
-  unsigned int Classify(double data[28][28]);
+  unsigned int Classify(float data[28][28]);
 
   // Internal forward pass, all state remains on the GPU. You probably want to
   // run Classify() if all you care about is the prediction.
-  void ForwardPass(double data[28][28]);
+  void ForwardPass(float data[28][28]);
 
   // Calculates the error of the previous forward pass with the training label
   // targetLabel and prepares the model for back propagation.

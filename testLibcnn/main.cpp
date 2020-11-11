@@ -1,5 +1,5 @@
 #define USE_MNIST_LOADER
-#define MNIST_DOUBLE
+#define MNIST_FLOAT
 #include "mnist.h"
 #include "libcnn.h"
 
@@ -24,13 +24,13 @@ static void test(Model *m);
 static inline bool loaddata()
 {
   int err;
-	err = mnist_load("../data/train-images.idx3-ubyte", "../data/train-labels.idx1-ubyte",
+	err = mnist_load("../data/train-images-idx3-ubyte", "../data/train-labels-idx1-ubyte",
 		&train_set, &train_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load training data\n");
     return false;
   }
-	err = mnist_load("../data/t10k-images.idx3-ubyte", "../data/t10k-labels.idx1-ubyte",
+	err = mnist_load("../data/t10k-images-idx3-ubyte", "../data/t10k-labels-idx1-ubyte",
 		&test_set, &test_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load t10k-images data\n");
@@ -74,7 +74,7 @@ int main(int argc, const  char **argv)
 static void learn(Model *m)
 {
 	float err;
-	int iter = 1;
+	int iter = 50;
 
 	fprintf(stdout ,"Learning\n");
 

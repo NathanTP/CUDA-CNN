@@ -25,8 +25,8 @@ extern "C" {
  * Make mnist loader to load image data as double type.
  * It divides unsigned char values by 255.0, so the results ranges from 0.0 to 1.0
  */
-#ifdef MNIST_DOUBLE
-#define MNIST_DATA_TYPE double
+#ifdef MNIST_FLOAT
+#define MNIST_DATA_TYPE float 
 #else
 #define MNIST_DATA_TYPE unsigned char
 #endif
@@ -160,9 +160,9 @@ _STATIC int mnist_load(
       return -1;
     }
 
-#ifdef MNIST_DOUBLE
+#ifdef MNIST_FLOAT
 		for (j = 0; j < 28*28; ++j) {
-			d->data[j/28][j%28] = read_data[j] / 255.0;
+			d->data[j/28][j%28] = (float)read_data[j];
 		}
 #else
 		memcpy(d->data, read_data, 28*28);

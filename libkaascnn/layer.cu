@@ -14,7 +14,7 @@ extern "C" void printLayerWeights(layerParams_t *l)
   } else {
     t = l->weight;
   }
-
+  fprintf(stderr,"Ready to print\n");
   for(int i = 0; i < l->N; i++) {
     for(int j = 0; j < l->M; j++) {
       printf("P%d,%d: %f\n", i, j, t[i + j*l->N]);

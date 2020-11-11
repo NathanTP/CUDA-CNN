@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #define USE_MNIST_LOADER
-#define MNIST_DOUBLE
+#define MNIST_FLOAT
 #include "mnist.h"
 
 #include "libkaascnn.h"
@@ -19,13 +19,13 @@ static inline mnistData_t *loaddata(void)
 
   mnistData_t *dat = malloc(sizeof(mnistData_t));
 
-	err = mnist_load("../data/train-images.idx3-ubyte", "../data/train-labels.idx1-ubyte",
+	err = mnist_load("../data/train-images-idx3-ubyte", "../data/train-labels-idx1-ubyte",
 		&dat->train_set, &dat->train_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load training data\n");
     return NULL;
   }
-	err = mnist_load("../data/t10k-images.idx3-ubyte", "../data/t10k-labels.idx1-ubyte",
+	err = mnist_load("../data/t10k-images-idx3-ubyte", "../data/t10k-labels-idx1-ubyte",
 		&dat->test_set, &dat->test_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load t10k-images data\n");
@@ -44,10 +44,10 @@ int main(void)
 
   // This is just hard coded for now, the model was trained using libfaascnn
   layerParams_t *hostLayers[4];
-  hostLayers[0] = layerParamsFromFile("./testModel/l_input");
-  hostLayers[1] = layerParamsFromFile("./testModel/l_c1");
-  hostLayers[2] = layerParamsFromFile("./testModel/l_s1");
-  hostLayers[3] = layerParamsFromFile("./testModel/l_f");
+  hostLayers[0] = layerParamsFromFile("../model/l_input");
+  hostLayers[1] = layerParamsFromFile("../model/l_c1");
+  hostLayers[2] = layerParamsFromFile("../model/l_s1");
+  hostLayers[3] = layerParamsFromFile("../model/l_f");
 
   // A KaaS system would manage inputs and outputs outside the user code, in
   // this case we're pretending to be the provider and loading the data before
@@ -79,10 +79,9 @@ int main(void)
   // No batching right now
   int nerr = 0;
   for(unsigned int i = 0; i < dat->test_cnt; i++) {
-  /* for(unsigned int i = 0; i < 2; i++) { */
+  /* for(unsigned int i = 0; i < 1; i++) { */
     unsigned int pred = classify(m, dat->test_set[i].data);
     if(pred != dat->test_set[i].label) {
-      /* printf("wrong pred (input %d): %d != %d\n", i, pred, dat->test_set[i].label); */
       nerr++;
     }
   }
