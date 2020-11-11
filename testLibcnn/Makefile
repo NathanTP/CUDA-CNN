@@ -1,5 +1,5 @@
 CC := g++
-CFLAGS := -O3 -g -Wall -Wextra -Werror -std=c++14 
+CFLAGS := -O0 -g -Wall -Wextra -std=c++14 
 # CFLAGS := -O0 -g -Wall -Wextra -Werror -std=c++14
 LIBS:=-L../libfaascnn/ -lfaascnn -lpthread
 INCLUDES:=-I../libfaascnn

@@ -22,11 +22,9 @@ Layer::Layer(int M, int N, int O)
 
 	for (int i = 0; i < N; ++i) {
 		h_bias[i] = 0.5f - float(rand()) / float(RAND_MAX);
-		/*h_bias[i] = 0.0f;*/
 
 		for (int j = 0; j < M; ++j) {
 			h_weight[i][j] = 0.5f - float(rand()) / float(RAND_MAX);
-			/*h_weight[i][j] = 0.05f;*/
 		}
 	}
 
@@ -61,7 +59,7 @@ Layer::Layer(std::string path, bool enableTrain)
   inF.read((char*)&N, sizeof(int));
   inF.read((char*)&O, sizeof(int));
   if(inF.fail()) {
-    throw std::runtime_error("Failed to write layer file\n");
+    throw std::runtime_error("Failed to read layer file\n");
   }
 
   float h_bias[N];

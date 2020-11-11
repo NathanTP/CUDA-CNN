@@ -24,13 +24,13 @@ static void test(Model *m);
 static inline bool loaddata()
 {
   int err;
-	err = mnist_load("data/train-images.idx3-ubyte", "data/train-labels.idx1-ubyte",
+	err = mnist_load("../data/train-images.idx3-ubyte", "../data/train-labels.idx1-ubyte",
 		&train_set, &train_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load training data\n");
     return false;
   }
-	err = mnist_load("data/t10k-images.idx3-ubyte", "data/t10k-labels.idx1-ubyte",
+	err = mnist_load("../data/t10k-images.idx3-ubyte", "../data/t10k-labels.idx1-ubyte",
 		&test_set, &test_cnt);
   if(err != 0) {
     fprintf(stderr, "Failed to load t10k-images data\n");
@@ -103,6 +103,7 @@ static void test(Model *m)
 {
 	int error = 0;
 
+	// for (unsigned int i = 0; i < test_cnt; ++i) {
 	for (unsigned int i = 0; i < test_cnt; ++i) {
 		if (m->Classify(test_set[i].data) != test_set[i].label) {
 			++error;
