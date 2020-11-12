@@ -4,6 +4,17 @@ import ctypes.util
 import pathlib
 import numpy as np
 
+class layerParams(ctypes.Structure):
+    _fields_ = [    ('bias', ctypes.POINTER(ctypes.c_float)),
+                    ('weight', ctypes.POINTER(ctypes.c_float)),
+                    ('output', ctypes.POINTER(ctypes.c_float)),
+                    ('preact', ctypes.POINTER(ctypes.c_float)),
+                    ('M', ctypes.c_int),
+                    ('N', ctypes.c_int),
+                    ('O', ctypes.c_int),
+                    ('onDevice', ctypes.c_bool)
+            ]
+
 def __setup():
     s = types.SimpleNamespace()
 
@@ -15,17 +26,16 @@ def __setup():
     # Function signatures
     s.cnnLib.initLibkaascnn.restype = ctypes.c_bool
 
-    # python doesn't need to know about the layerParams or model structs
-    s.cnnLib.layerParamsFromFile.restype = ctypes.c_void_p
+    s.cnnLib.layerParamsFromFile.restype = ctypes.POINTER(layerParams)
     s.cnnLib.layerParamsFromFile.argtypes = [ ctypes.c_char_p ]
 
-    s.cnnLib.layerParamsToDevice.restype = ctypes.c_void_p
-    s.cnnLib.layerParamsToDevice.argtypes = [ctypes.c_void_p]
+    s.cnnLib.layerParamsToDevice.restype = ctypes.POINTER(layerParams)
+    s.cnnLib.layerParamsToDevice.argtypes = [ctypes.POINTER(layerParams)]
 
     s.cnnLib.newModel.restype = ctypes.c_void_p
     s.cnnLib.newModel.argtypes = [ctypes.c_void_p]*4
 
-    s.cnnLib.printLayerWeights.argtypes = [ ctypes.c_void_p ]
+    s.cnnLib.printLayerWeights.argtypes = [ ctypes.POINTER(layerParams) ]
 
     s.cnnLib.classify.restype = ctypes.c_uint32
     s.cnnLib.classify.argtypes = [ ctypes.c_void_p, np.ctypeslib.ndpointer(ctypes.c_float, flags="C_CONTIGUOUS") ]

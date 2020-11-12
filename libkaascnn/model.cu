@@ -18,14 +18,6 @@ extern "C" modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layer
 
 extern "C" unsigned int classify(modelState_t *m, float inp[28][28])
 {
-  /* for(int i = 0; i < 28; i++) { */
-  /*   printf("\n"); */
-  /*   for(int j = 0; j < 28; j++) { */
-  /*     printf("%lf,", inp[i][j]); */
-  /*   } */
-  /* } */
-  /* printf("\n"); */
-
   clearLayer(m->input);
   clearLayer(m->c);
   clearLayer(m->s);
