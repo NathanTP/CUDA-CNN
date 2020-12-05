@@ -5,10 +5,18 @@ import pathlib
 import numpy as np
 
 class layerParams(ctypes.Structure):
-    _fields_ = [    ('bias', ctypes.POINTER(ctypes.c_float)),
+    _fields_ = [    # Vector of N floats
+                    ('bias', ctypes.POINTER(ctypes.c_float)),
+
+                    # Matrix of NxM floats
                     ('weight', ctypes.POINTER(ctypes.c_float)),
+
+                    # Vector of O floats
                     ('output', ctypes.POINTER(ctypes.c_float)),
+
+                    # Vector of O floats (only ever exists on the device)
                     ('preact', ctypes.POINTER(ctypes.c_float)),
+
                     ('M', ctypes.c_int),
                     ('N', ctypes.c_int),
                     ('O', ctypes.c_int),

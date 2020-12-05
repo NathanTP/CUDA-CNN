@@ -12,5 +12,3 @@ extern "C" bool initLibkaascnn(void)
 
   return true;
 }
-
-

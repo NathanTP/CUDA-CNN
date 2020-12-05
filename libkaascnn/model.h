@@ -21,9 +21,12 @@ typedef struct {
 // up to the user (in kaas, device memory isn't managed by the application).
 extern "C" modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layerParams_t *s1, layerParams_t *fin);
 
+// Classify the image and return the full set of predictions (probabilities for each digit)
+extern "C" bool classifyFull(modelState_t *m, float inp[28][28], float output[10]);
+
 // Convenience function to all each layer's forward pass and extract the
 // prediction. You can also use the lower-level functions defined below.
-extern "C" unsigned int classify(modelState_t *m, float inp[28][28]);
+extern "C" int classify(modelState_t *m, float inp[28][28]);
 
 /*====================================================
  * Lowest-layer interfaces, these take only device pointers and only call CUDA
@@ -35,16 +38,17 @@ extern "C" unsigned int classify(modelState_t *m, float inp[28][28]);
  * KaaS infrastructure.
  */
 // Input is the image
-extern "C" void kaasLayerCForward(float *input, float *preact, float *weight, float *bias, float *output);
+extern "C" void kaasLayerCForward(int grid, int block, void **bufs);
 
 // Intermediate layer takes output of layerC
-extern "C" void kaasLayerSForward(float *input, float *preact, float *weight, float *bias, float *output);
+extern "C" void kaasLayerSForward(int grid, int block, void **bufs);
 
 // Output is the predictions (array of 9 floats with the probability estimates
 // for each digit, take the max for the prediction)
-extern "C" void kaasLayerFinForward(float *input, float *preact, float *weight, float *bias, float *output);
+extern "C" void kaasLayerFForward(int grid, int block, void **bufs);
 #else
 modelState_t *newModel(layerParams_t *input, layerParams_t *c1, layerParams_t *s1, layerParams_t *fin);
+bool classifyFull(modelState_t *m, float inp[28][28], float output[10]);
 unsigned int classify(modelState_t *m, float inp[28][28]);
 void kaasLayerCForward(float *input, float *preact, float *weight, float *bias, float *output);
 void kaasLayerSForward(float *input, float *preact, float *weight, float *bias, float *output);

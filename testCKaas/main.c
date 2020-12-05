@@ -34,12 +34,12 @@ static inline mnistData_t *loaddata(void)
   return dat;
 }
 
-int main(void)
+modelState_t *getModel(void)
 {
   bool ok;
   ok = initLibkaascnn();
   if(!ok) {
-    return 1;
+    return NULL;
   }
 
   // This is just hard coded for now, the model was trained using libfaascnn
@@ -48,7 +48,7 @@ int main(void)
   hostLayers[1] = layerParamsFromFile("../model/l_c1");
   hostLayers[2] = layerParamsFromFile("../model/l_s1");
   hostLayers[3] = layerParamsFromFile("../model/l_f");
-
+  
   // A KaaS system would manage inputs and outputs outside the user code, in
   // this case we're pretending to be the provider and loading the data before
   // running the model.
@@ -56,30 +56,50 @@ int main(void)
   for(int i = 0; i < 4; i++) {
     if(hostLayers[i] == NULL) {
       fprintf(stderr, "Layer %d did not load from file\n", i);
-      return 1;
+      return NULL;
     }
     
     devLayers[i] = layerParamsToDevice(hostLayers[i]);
     if(devLayers[i] == NULL) {
       fprintf(stderr, "Layer %d did not load onto the device\n", i);
-      return 1;
-    }    
+      return NULL;
+    }
   }
 
   modelState_t *m = newModel(devLayers[0], devLayers[1], devLayers[2], devLayers[3]);
   if(!m) {
-    return 1;
+    return NULL;
   }
 
-  mnistData_t *dat = loaddata();
-  if(!dat) {
-    return 1;
-  }
+  return m;
+}
+
+bool testDetailed(modelState_t *m, mnistData_t *dat, int n)
+{
+    float res[10];
+    for(int i = 0; i < n; i++) {
+        if(!classifyFull(m, dat->test_set[i].data, res)) {
+            printf("Prediction Failed\n");
+            return false;
+        }
+
+        printf("Expect %d\n", dat->test_set[i].label);
+        printf("Predictions: ");
+        for(int i = 0; i < 10; i++) {
+            printf("%f, ", res[i]);
+        }
+        printf("\n\n");
+    }
+
+    return true;
+}
+
+int testOOP(modelState_t *m, mnistData_t *dat)
+{
 
   // No batching right now
   int nerr = 0;
   for(unsigned int i = 0; i < dat->test_cnt; i++) {
-  /* for(unsigned int i = 0; i < 1; i++) { */
     unsigned int pred = classify(m, dat->test_set[i].data);
     if(pred != dat->test_set[i].label) {
       nerr++;
@@ -88,4 +108,22 @@ int main(void)
 
   printf("Done, error: %lf\n", (double)nerr / dat->test_cnt);
   return 0;
+}
+
+int main(void) {
+  modelState_t *m = getModel();
+  if(!m) {
+      printf("Failed to get model\n");
+      return 1;
+  }
+
+  mnistData_t *dat = loaddata();
+  if(!dat) {
+    return 1;
+  }
+
+  if(!testDetailed(m, dat, 1)) {
+      printf("Test failure\n");
+  }
+  /* testOOP(m, dat); */
 }
