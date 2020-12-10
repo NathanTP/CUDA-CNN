@@ -73,9 +73,9 @@ extern "C" void kaasLayerCForward(int grid, int block, void **bufs)
     float *preact = (float*)bufs[3];
     float *output = (float*)bufs[4];
 
-	fp_preact_c1<<<grid, block>>>((float (*)[28])input, (float (*)[24][24])preact, (float (*)[5][5])weight);
-	fp_bias_c1<<<grid, block>>>((float (*)[24][24])preact, bias);
-	apply_step_function<<<grid, block>>>(preact, output,  24*24*6);
+	fp_preact_c1<<<grid, block>>>((float (*)[28])input, (float (*)[5][5])weight, (float (*)[24][24])preact);
+	fp_bias_c1<<<grid, block>>>(bias, (float (*)[24][24])preact);
+	apply_step_function<<<grid, block>>>(24*24*6, preact, output);
 }
 
 // Intermediate layer takes output of layerC
@@ -87,9 +87,9 @@ extern "C" void kaasLayerSForward(int grid, int block, void **bufs)
     float *preact = (float*)bufs[3];
     float *output = (float*)bufs[4];
 
-	fp_preact_s1<<<grid, block>>>((float (*)[24][24])input, (float (*)[6][6])preact, (float (*)[4][4])weight);
-	fp_bias_s1<<<grid, block>>>((float (*)[6][6])preact, bias);
-	apply_step_function<<<grid, block>>>(preact, output, 6*6*6);
+	fp_preact_s1<<<grid, block>>>((float (*)[24][24])input, (float (*)[4][4])weight, (float (*)[6][6])preact);
+	fp_bias_s1<<<grid, block>>>(bias, (float (*)[6][6])preact);
+	apply_step_function<<<grid, block>>>(6*6*6, preact, output);
 }
 
 // Output is the predictions (array of 9 floats with the probability estimates
@@ -102,7 +102,7 @@ extern "C" void kaasLayerFForward(int grid, int block, void **bufs)
     float *preact = (float*)bufs[3];
     float *output = (float*)bufs[4];
 
-	fp_preact_f<<<grid, block>>>((float (*)[6][6])input, preact, (float (*)[6][6][6])weight);
-	fp_bias_f<<<grid, block>>>(preact, bias);
-	apply_step_function<<<grid, block>>>(preact, output, 10);
+	fp_preact_f<<<grid, block>>>((float (*)[6][6])input, (float (*)[6][6][6])weight, preact);
+	fp_bias_f<<<grid, block>>>(bias, preact);
+	apply_step_function<<<grid, block>>>(10, preact, output);
 }

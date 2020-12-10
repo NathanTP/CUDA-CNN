@@ -14,6 +14,7 @@ import kaasServer as kaas
 redisPwd = "Cd+OBWBEAXV0o2fg5yDrMjD9JUkW7J6MATWuGlRtkQXk/CBvf2HYEjKDYw4FC+eWPeVR8cQKWr7IztZy"
 
 modelLibPath = pathlib.Path("../libkaascnn/libkaascnn.so").resolve()
+kernelLibPath = pathlib.Path("../libkaascnn/libkaascnn.cubin").resolve()
 modelDir = pathlib.Path("../model").resolve()
 dataDir = pathlib.Path("../data").resolve()
 
@@ -104,118 +105,100 @@ def loadLayersLocal(path):
         raise RuntimeError("Failed to load layers")
 
 
-class kaasLayer():
-    def __init__(self, name, inputs, temps, outputs, N, M, O):
-        self.name = name
-        self.inputs = inputs
-        self.temps = temps
-        self.outputs = outputs
+def getLayerKerns(name, inputBuf, weights, bias, preact, output):
+    kerns = [
+            kaas.kernelSpec(kernelLibPath, "fp_preact_"+name,
+                (64,1,1), (64,1,1),
+                inputs=[inputBuf, weights],
+                outputs=[preact]),
 
-        # Layer Dimensions (in number of floats)
-        self.N = N
-        self.M = M
-        self.O = O
+            kaas.kernelSpec(kernelLibPath, "fp_bias_"+name,
+                (64,1,1), (64,1,1),
+                inputs=[bias, preact],
+                outputs=[preact]),
 
-
-    def getKernel(self, kernName, inputSpec, outputSpec=None):
-        """This creates the local kernel description from this layer. inputSpec
-        is a kaas.bufferSpec. outputSpec will store the output layer. If
-        outputSpec is None, the output will be considered intermediate and
-        ephemeral."""
-
-        if outputSpec is not None:
-            outputs = [ outputSpec ]
-        else:
-            outputs = self.outputs
-
-        return kaas.kernelSpec(modelLibPath, kernName,
-                64, 64,
-                inputs=[inputSpec] + self.inputs, temps=self.temps, outputs=outputs)
-
-
-def prepareLayer(layer, name, ctx, intermediate):
-    """Prepare the layer for KaaS execution. Stores the parameters in layer in
-    the libff context and returns the parameter inputs and temporaries lists.
-    The caller must add input buffers. If intermediate is true, the
-    output buffer is considered ephemeral."""
-
-    layer = layer.contents
-    N = layer.N
-    M = layer.M
-    O = layer.O
-
-    # Upload Model. We convert to numpy arrays for pickling.
-    ctx.kv.put(name+"-bias", np.ctypeslib.as_array(layer.bias, shape=(layer.N,)))
-    ctx.kv.put(name + "-weight", np.ctypeslib.as_array(layer.weight, shape=(layer.N * layer.M,)))
-
-    inputs = [
-            kaas.bufferSpec(name+"-weight", N*M*4, const=True),
-            kaas.bufferSpec(name+"-bias", N*4, const=True)
+            kaas.kernelSpec(kernelLibPath, "apply_step_function",
+                (64,1,1), (64,1,1),
+                literals=[ kaas.literalSpec('Q', output.size // 4) ],
+                inputs=[preact],
+                outputs=[output])
             ]
+    return kerns
 
-    temps = [ kaas.bufferSpec(name+"-preact", O*4, ephemeral=True) ]
+class model():
+    def __init__(self, ctx, kaasHandle):
+        libHandle = getLibCnnHandle()
 
-    if intermediate:
-        outputs = [ kaas.bufferSpec(name+"-out", O*4, ephemeral=True) ]
-    else:
-        outputs = []
+        hlayers = [ libHandle.cnnLib.layerParamsFromFile(str(modelDir / 'l_c1').encode('utf-8')).contents,
+                    libHandle.cnnLib.layerParamsFromFile(str(modelDir / 'l_s1').encode('utf-8')).contents,
+                    libHandle.cnnLib.layerParamsFromFile(str(modelDir / 'l_f').encode('utf-8')).contents ]
 
-    return kaasLayer(name, inputs, temps, outputs, N, M, O)
+        layerModels = []
+        layerPreacts  = []
+        # Layer setup
+        for name, layer in zip(['c1', 's1', 'f'], hlayers): 
+            ctx.kv.put(name+"-bias", np.ctypeslib.as_array(layer.bias, shape=(layer.N,)))
+            ctx.kv.put(name + "-weight", np.ctypeslib.as_array(layer.weight, shape=(layer.N * layer.M,)))
+
+            layerModels.append( (
+                kaas.bufferSpec(name+"-weight", layer.N*layer.M*4, const=True),
+                kaas.bufferSpec(name+"-bias", layer.N*4, const=True)
+                ))
+
+            layerPreacts.append(kaas.bufferSpec(name+"-preact", layer.O*4, ephemeral=True))
 
 
-class kaasModel():
-    def __init__(self, layers, ctx, kaasHandle):
-        self.layers = layers
+        c1Out = kaas.bufferSpec('c1-out', hlayers[0].O*4, ephemeral=True)
+        s1Out = kaas.bufferSpec('s1-out', hlayers[1].O*4, ephemeral=True)
+
+        # We need to know the size of the output to generate the kernels. This
+        # bufferSpec will be replaced when we actually call the model.
+        fOut = kaas.bufferSpec('outputPlaceholder', hlayers[2].O*4)
+
+        # The first input and last output will get filled in when the model actually gets called
+        allKerns = []
+        allKerns += getLayerKerns('c1',  None, layerModels[0][0], layerModels[0][1], layerPreacts[0], c1Out)
+        allKerns += getLayerKerns('s1',  c1Out, layerModels[1][0], layerModels[1][1], layerPreacts[1], s1Out)
+        allKerns += getLayerKerns('f',   s1Out, layerModels[2][0], layerModels[2][1], layerPreacts[2], fOut)
+
+        self.kerns = allKerns
         self.ctx = ctx
-        self.kaasHandle = kaasHandle
+        self.handle = kaasHandle
+        self.inSize = hlayers[0].N*4
+        self.outSize = hlayers[2].O*4
 
 
     def classify(self, inputName, outputName):
-        """Invoke the model on inputName (must already be in kv store). The
-        output will be available in outputName."""
-        
-        kerns = [ self.layers[0].getKernel('kaasLayerCForward', kaas.bufferSpec(inputName,
-                    self.layers[0].N*4)),
-                  self.layers[1].getKernel('kaasLayerSForward', self.layers[0].outputs[0]),
-                  self.layers[2].getKernel('kaasLayerFForward', self.layers[1].outputs[0],
-                    kaas.bufferSpec(outputName, self.layers[2].O*4))
-                ]
+        inputBuf = kaas.bufferSpec(inputName, self.inSize) 
+        outBuf = kaas.bufferSpec(outputName, self.outSize)
 
-        req = kaas.kaasReq(kerns)
-        self.kaasHandle.Invoke(req.toDict())
+        self.kerns[0].inputs[0] = inputBuf
+        self.kerns[-1].outputs[0] = outBuf
 
+        req = kaas.kaasReq(self.kerns)
+        self.handle.Invoke(req.toDict())
 
-def prepareModel(path, libffCtx, kaasHandle, libHandle):
-    """Load the model into the KV store and prepare a template for execution."""
-    hlayers = [ libHandle.cnnLib.layerParamsFromFile(str(path / 'l_c1').encode('utf-8')),
-                libHandle.cnnLib.layerParamsFromFile(str(path / 'l_s1').encode('utf-8')),
-                libHandle.cnnLib.layerParamsFromFile(str(path / 'l_f').encode('utf-8')) ]
-
-    if None in hlayers:
-        raise RuntimeError("Failed to load layers")
-
-    klayers = []
-
-    klayers.append(prepareLayer(hlayers[0], 'l_c1', libffCtx, intermediate=True))
-    klayers.append(prepareLayer(hlayers[1], 'l_s1', libffCtx, intermediate=True))
-    klayers.append(prepareLayer(hlayers[2], 'l_f', libffCtx, intermediate=False))
-
-    return kaasModel(klayers, libffCtx, kaasHandle)
+        pred = self.ctx.kv.get(outputName)
+        return np.argmax(np.frombuffer(pred.data, dtype=np.float32))
 
 
 if __name__ == '__main__':
     ffCtx = getCtx(remote=False)
     kaasHandle = kaas.getHandle('direct', ffCtx)
-    libHandle = getLibCnnHandle()
 
-    model = prepareModel(modelDir, ffCtx, kaasHandle, libHandle)
+    model = model(ffCtx, kaasHandle)
 
     imgs, lbls = loadMnist(dataDir)
     
-    print("Trying to predict ", lbls[0])
-    ffCtx.kv.put('testInput', imgs[0])
+    nWrong = 0
+    for i in range(len(imgs)):
+        ffCtx.kv.put('testInput', imgs[i])
 
-    model.classify('testInput', 'testOutput')
+        model.classify('testInput', 'testOutput')
 
-    pred = ffCtx.kv.get('testOutput')
-    print(np.argmax(np.frombuffer(pred.data, dtype=np.float32)))
+        preds = ffCtx.kv.get('testOutput')
+        topPred = np.argmax(np.frombuffer(preds.data, dtype=np.float32))
+        if topPred != lbls[i]:
+            nWrong += 1
+
+    print("Error Rate: ", (nWrong / len(imgs))*100)

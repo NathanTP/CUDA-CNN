@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "kernels.h"
 #include "cuda.h"
 
@@ -6,7 +7,8 @@ __device__ float step_function(float v)
 	return 1 / (1 + exp(-v));
 }
 
-__global__ void apply_step_function(float *input, float *output, const int N)
+extern "C"
+__global__ void apply_step_function(const uint64_t N, float *input, float *output)
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -36,7 +38,8 @@ __global__ void apply_grad(float *output, float *grad, const int N)
 	}
 }
 
-__global__ void fp_preact_c1(float input[28][28], float preact[6][24][24], float weight[6][5][5])
+extern "C"
+__global__ void fp_preact_c1(float input[28][28], float weight[6][5][5], float preact[6][24][24])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -55,7 +58,8 @@ __global__ void fp_preact_c1(float input[28][28], float preact[6][24][24], float
 	}
 }
 
-__global__ void fp_bias_c1(float preact[6][24][24], float bias[6])
+extern "C"
+__global__ void fp_bias_c1(float bias[6], float preact[6][24][24])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -72,7 +76,8 @@ __global__ void fp_bias_c1(float preact[6][24][24], float bias[6])
 	}
 }
 
-__global__ void fp_preact_s1(float input[6][24][24], float preact[6][6][6], float weight[1][4][4])
+extern "C"
+__global__ void fp_preact_s1(float input[6][24][24], float weight[1][4][4], float preact[6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -91,7 +96,8 @@ __global__ void fp_preact_s1(float input[6][24][24], float preact[6][6][6], floa
 	}
 }
 
-__global__ void fp_bias_s1(float preact[6][6][6], float bias[1])
+extern "C"
+__global__ void fp_bias_s1(float bias[1], float preact[6][6][6])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -108,7 +114,8 @@ __global__ void fp_bias_s1(float preact[6][6][6], float bias[1])
 	}
 }
 
-__global__ void fp_preact_f(float input[6][6][6], float preact[10], float weight[10][6][6][6])
+extern "C"
+__global__ void fp_preact_f(float input[6][6][6], float weight[10][6][6][6], float preact[10])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;
@@ -126,7 +133,8 @@ __global__ void fp_preact_f(float input[6][6][6], float preact[10], float weight
 	}
 }
 
-__global__ void fp_bias_f(float preact[10], float bias[10])
+extern "C"
+__global__ void fp_bias_f(float bias[10], float preact[10])
 {
 	const int pos = blockIdx.x * blockDim.x + threadIdx.x;
 	const int size = blockDim.x * gridDim.x;

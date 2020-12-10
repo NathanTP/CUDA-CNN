@@ -122,8 +122,8 @@ int main(void) {
     return 1;
   }
 
-  if(!testDetailed(m, dat, 1)) {
-      printf("Test failure\n");
-  }
-  /* testOOP(m, dat); */
+  /* if(!testDetailed(m, dat, 1)) { */
+  /*     printf("Test failure\n"); */
+  /* } */
+  testOOP(m, dat);
 }
